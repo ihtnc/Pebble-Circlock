@@ -1,19 +1,36 @@
 {
-    "versionLabel": "2.1.1",
-    "uuid": "68dc5a59-3d48-4699-b84e-a8fde6a51108",
-    "appKeys": {},
-    "longName": "Polar Clock Lite 2.0",
+    "versionLabel": "1.0",
+    "uuid": "00884a5c-9150-4f28-845d-9fa9aec46123",
+    "appKeys": {
+        "Action": 29073,
+        "BTNotification": 29071,
+        "ShowMode": 29072,
+        "InvertMode": 29070
+    },
+    "longName": "Circlock",
     "versionCode": 2,
     "capabilities": [
         "configurable"
     ],
-    "shortName": "Polar Clock Lite 2.0",
-    "companyName": "Niraj Sanghvi",
+    "shortName": "Circlock",
+    "companyName": "ihopethisnamecounts",
     "watchapp": {
         "watchface": true
     },
     "resources": {
         "media": [
+            {
+                "characterRegex": "[\\+\\`\\$\\%\\?\\&\\s]",
+                "type": "font",
+                "name": "FONT_SYMBOLS_25",
+                "file": "fonts/OrangeKid-Mod.ttf"
+            },
+            {
+                "characterRegex": "[A-Za-z0-9\\s]",
+                "type": "font",
+                "name": "FONT_IMAGINE_20",
+                "file": "fonts/imagine.ttf"
+            },
             {
                 "menuIcon": true,
                 "type": "png",

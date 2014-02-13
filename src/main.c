@@ -1,356 +1,364 @@
 /*
-
-  Polar Clock Lite watch (SDK 2.0)
-
-  Thanks to Team Pebble's Segment Six watchface...it was a big help!
-
+  Inspired by the Polar Clock Lite watch (SDK 2.0) from https://github.com/op12/PolarClockLite2.0
  */
 
-#include "pebble.h"
+#include "main.h"
+#include "btmonitor.h"
+#include "thincfg.h"
+#include "options.h"
 
-/* 
-#define SHOW_TEXT_TIME 1
-#define SHOW_TEXT_DATE 1
-#define ROW_DATE 0
-*/
-	
-enum {
-        KEY_TIME = 0x0,
-        KEY_DATE = 0x1,
-        KEY_ROW = 0x2,
-		KEY_INVERT = 0x3
-};
-
-static bool SHOW_TEXT_TIME = true;
-static bool SHOW_TEXT_DATE = true;
-static bool ROW_DATE = false;
-static bool INVERT = false;
-
-/*
-#define BACKGROUND_COLOR GColorBlack
-#define FOREGROUND_COLOR GColorWhite
-*/
-
-static GColor BACKGROUND_COLOR = GColorBlack;
-static GColor FOREGROUND_COLOR = GColorWhite;
-
-static char time_text[] = "00:00";
-static char date_text[] = "00 Xxx";
-static char date_row_text[] = "00 Xxx";
+static char date_text[] = "XXX 00";
+static char status_text[] = "X X";
 
 Window *window;
+InverterLayer *inverter;
 
 Layer *minute_display_layer;
 Layer *hour_display_layer;
 
-TextLayer *text_time_layer;
+TextLayer *text_status_layer;
 TextLayer *text_date_layer;
-bool time_layer_exists = false;
-bool date_layer_exists = false;
 
-const GPathInfo MINUTE_SEGMENT_PATH_POINTS = {
-  3,
-  (GPoint []) {
-    {0, 0},
-    {-7, -70}, // 70 = radius + fudge; 7 = 70*tan(6 degrees); 6 degrees per minute;
-    {7,  -70},
-  }
-};
+static GFont font;
+static GFont sym_font;
+static bool is_stat_showing;
 
 static GPath *minute_segment_path;
-
-
-const GPathInfo HOUR_SEGMENT_PATH_POINTS = {
-  3,
-  (GPoint []) {
-    {0, 0},
-    {-6, -58}, // 58 = radius + fudge; 6 = 58*tan(6 degrees); 30 degrees per hour;
-    {6,  -58},
-  }
+const GPathInfo MINUTE_SEGMENT_PATH_POINTS = 
+{
+	3,
+	(GPoint []) 
+	{
+		{0, 0},
+		{-7, -70}, // 70 = radius + fudge; 7 = 70*tan(6 degrees); 6 degrees per minute;
+		{7,  -70},
+	}
 };
 
 static GPath *hour_segment_path;
+const GPathInfo HOUR_SEGMENT_PATH_POINTS = 
+{
+	3,
+	(GPoint []) 
+	{
+		{0, 0},
+		{-6, -58}, // 58 = radius + fudge; 6 = 58*tan(6 degrees); 30 degrees per hour;
+		{6,  -58},
+	}
+};
 
+static AppTimer *timer;
 
-static void minute_display_layer_update_callback(Layer *layer, GContext* ctx) {
-
-  time_t now = time(NULL);
-  struct tm *t = localtime(&now);
-
-  unsigned int angle = t->tm_min * 6;
-
-  GRect bounds = layer_get_bounds(layer);
-  GPoint center = grect_center_point(&bounds);
-
-  graphics_context_set_fill_color(ctx, FOREGROUND_COLOR);
-
-  graphics_fill_circle(ctx, center, 65);
-
-  graphics_context_set_fill_color(ctx, BACKGROUND_COLOR);
-
-  for(; angle < 355; angle += 6) {
-
-    gpath_rotate_to(minute_segment_path, (TRIG_MAX_ANGLE / 360) * angle);
-
-    gpath_draw_filled(ctx, minute_segment_path);
-
-  }
-
-  graphics_fill_circle(ctx, center, 60);
-
+static void determine_invert_status(struct tm *tick_time)
+{
+	bool invert;
+	
+	invert = (tick_time->tm_hour < 12) && false;
+	layer_set_frame(inverter_layer_get_layer(inverter), GRect(0, 0, SCREEN_WIDTH, (invert ? SCREEN_HEIGHT : 0)));
 }
 
-
-static void hour_display_layer_update_callback(Layer *layer, GContext* ctx) {
-
-  time_t now = time(NULL);
-  struct tm *t = localtime(&now);
-
-  unsigned int angle = (( t->tm_hour % 12 ) * 30) + (t->tm_min / 2);
+static void minute_display_layer_update_callback(Layer *layer, GContext* ctx) 
+{
+	time_t now = time(NULL);
+	struct tm *t = localtime(&now);
+	unsigned int angle = t->tm_min * 6;
+	GRect bounds = layer_get_bounds(layer);
+	GPoint center = grect_center_point(&bounds);
 	
-  angle = angle - (angle % 6);
-
-  GRect bounds = layer_get_bounds(layer);
-  GPoint center = grect_center_point(&bounds);
-
-  graphics_context_set_fill_color(ctx, FOREGROUND_COLOR);
-
-  graphics_fill_circle(ctx, center, 55);
-
-  graphics_context_set_fill_color(ctx, BACKGROUND_COLOR);
-
-  for(; angle < 355; angle += 6) {
-
-    gpath_rotate_to(hour_segment_path, (TRIG_MAX_ANGLE / 360) * angle);
-
-    gpath_draw_filled(ctx, hour_segment_path);
-
-  }
-
-  graphics_fill_circle(ctx, center, 50);
-
+	graphics_context_set_fill_color(ctx, GColorWhite);
+	graphics_fill_circle(ctx, center, 65);
+	
+	graphics_context_set_fill_color(ctx, GColorBlack);
+	for(; angle < 355; angle += 6) 
+	{
+		gpath_rotate_to(minute_segment_path, (TRIG_MAX_ANGLE / 360) * angle);
+		gpath_draw_filled(ctx, minute_segment_path);
+	}
+	
+	graphics_fill_circle(ctx, center, 60);
 }
 
-
-static void handle_minute_tick(struct tm *tick_time, TimeUnits units_changed) {
-  //(void)ctx;
+static void layer_set_status(TextLayer *layer)
+{
+	bool bt = bluetooth_connection_service_peek();
+	BatteryChargeState batt = battery_state_service_peek();
 	
-  layer_mark_dirty(minute_display_layer);
-  layer_mark_dirty(hour_display_layer);
-
-  if (SHOW_TEXT_TIME && time_layer_exists)
-  {
-	  // Need to be static because it's used by the system later.
-	  //static char time_text[] = "00:00";
+	char sym_bt;
+	if(bt) sym_bt = '`';
+	else sym_bt = 'a';
 	
-	  char *time_format;
+	char sym_batt;
+	if(batt.is_charging) sym_batt = '+';
+	else if(batt.charge_percent <= 25) sym_batt = '?';
+	else if(batt.charge_percent <= 50) sym_batt = '&';
+	else if(batt.charge_percent <= 75) sym_batt = '%';
+	else if(batt.charge_percent <= 100) sym_batt = '$';
+	else sym_batt = 'a';
 	
-	  if (clock_is_24h_style()) {
-		time_format = "%R";
-	  } else {
-		time_format = "%I:%M";
-	  }
-	
-	  strftime(time_text, sizeof(time_text), time_format, tick_time);
-	
-	  text_layer_set_text(text_time_layer, time_text);
-  }
-
-  if (SHOW_TEXT_DATE && date_layer_exists)
-  {
-	  //static char date_text[] = "00 Xxx";
-	  if (ROW_DATE)
-	  {
-		  //date_text = "xx Xxx";
-	  	  strftime(date_row_text, sizeof(date_row_text), "%d %b", tick_time);
-		  strftime(date_text, sizeof(date_text), "%b %d", tick_time);
-		  text_layer_set_text(text_date_layer, date_row_text);
-	  } else {
-		  //date_text = "Xxx xx";
-		  strftime(date_row_text, sizeof(date_row_text), "%d %b", tick_time);
-	  	  strftime(date_text, sizeof(date_text), "%b %d", tick_time);
-		  text_layer_set_text(text_date_layer, date_text);
-	  }
-	  //text_layer_set_text(text_date_layer, date_text);
-  }
+	snprintf(status_text, sizeof(status_text), "%c %c", sym_batt, sym_bt);
+	text_layer_set_text(layer, status_text);
+	text_layer_set_font(layer, sym_font);
 }
 
-static void setup_time_date_layers() {
-	
-  Layer *window_layer = window_get_root_layer(window);
-  GRect bounds = layer_get_bounds(window_layer);
-	
-  if(time_layer_exists) {
-	  text_layer_destroy(text_time_layer);
-	  time_layer_exists = false;	
-  }
-  
-  if(date_layer_exists) {
-	  text_layer_destroy(text_date_layer);
-	  date_layer_exists = false;		
-  }
-	
-  if (SHOW_TEXT_TIME)
-  {
-	  text_time_layer = text_layer_create(bounds);
-	  time_layer_exists = true;
-	  text_layer_set_text_color(text_time_layer, FOREGROUND_COLOR);
-	  text_layer_set_background_color(text_time_layer, GColorClear);
-	  text_layer_set_text_alignment(text_time_layer, GTextAlignmentCenter);
-	  
-	  text_layer_set_font(text_time_layer, fonts_get_system_font(FONT_KEY_ROBOTO_CONDENSED_21));
-	  layer_add_child(window_layer, text_layer_get_layer(text_time_layer));
-	  	
-	  if (SHOW_TEXT_DATE)
-	  {
-	  	layer_set_frame(text_layer_get_layer(text_time_layer), GRect(0, 57, 144, 168-57));
-	  } else {
-	  	layer_set_frame(text_layer_get_layer(text_time_layer), GRect(0, 70, 144, 168-70));
-	  }
-	  
-  }
-
-  if (SHOW_TEXT_DATE)
-  {
-	  text_date_layer = text_layer_create(bounds);
-	  date_layer_exists = true;
-	  text_layer_set_text_color(text_date_layer, FOREGROUND_COLOR);
-	  text_layer_set_background_color(text_date_layer, GColorClear);
-	  text_layer_set_text_alignment(text_date_layer, GTextAlignmentCenter);
-	  
-	  text_layer_set_font(text_date_layer, fonts_get_system_font(FONT_KEY_ROBOTO_CONDENSED_21));
-	  layer_add_child(window_layer, text_layer_get_layer(text_date_layer));
-	  
-	  if (SHOW_TEXT_TIME)
-	  {
-		  layer_set_frame(text_layer_get_layer(text_date_layer), GRect(0, 80, 144, 168-80));
-	  } else {
-		  layer_set_frame(text_layer_get_layer(text_date_layer), GRect(0, 70, 144, 168-70));
-	  }
-	  
-  }
+static void layer_set_date(TextLayer *layer)
+{
+	time_t now = time(NULL);
+	struct tm *t = localtime(&now);
+	strftime(date_text, sizeof(date_text), "%a %d", t);
+	text_layer_set_text(layer, date_text);
+	text_layer_set_font(layer, font);
 }
 
- void in_received_handler(DictionaryIterator *received, void *context) {
-	 Tuple *time_tuple = dict_find(received, KEY_TIME);
-	 Tuple *date_tuple = dict_find(received, KEY_DATE);
-	 Tuple *row_tuple = dict_find(received, KEY_ROW);
-	 Tuple *invert_tuple = dict_find(received, KEY_INVERT);
-	 
-	 //APP_LOG(APP_LOG_LEVEL_DEBUG, "KEY_TIME: %d, %d, %d", time_tuple->type, time_tuple->length, time_tuple->value->uint8 );
-	 //APP_LOG(APP_LOG_LEVEL_DEBUG, "KEY_DATE: %d, %d, %d", date_tuple->type, date_tuple->length, date_tuple->value->int8 );
-	 //APP_LOG(APP_LOG_LEVEL_DEBUG, "KEY_ROW: %d, %d, %d", row_tuple->type, row_tuple->length, row_tuple->value->int8 );
-	 //APP_LOG(APP_LOG_LEVEL_DEBUG, "KEY_INVERT: %d, %d, %d", invert_tuple->type, invert_tuple->length, invert_tuple->value->uint8 );
-	 
-	 SHOW_TEXT_TIME = time_tuple->value->int8 ? true : false;
-	 persist_write_bool(KEY_TIME, SHOW_TEXT_TIME);
-	 SHOW_TEXT_DATE = date_tuple->value->int8 ? true : false;
-	 persist_write_bool(KEY_DATE, SHOW_TEXT_DATE);
-	 ROW_DATE = row_tuple->value->int8 ? true : false;
-	 persist_write_bool(KEY_ROW, ROW_DATE);
-	 INVERT = invert_tuple->value->int8 ? true : false;
-	 persist_write_bool(KEY_INVERT, INVERT);
-	 if(INVERT)
-	 {
-		BACKGROUND_COLOR = GColorWhite;
-		FOREGROUND_COLOR = GColorBlack;
-	 }
-	 else
-	 {
-		BACKGROUND_COLOR = GColorBlack;
-		FOREGROUND_COLOR = GColorWhite;		 		 
-	 }
-	 window_set_background_color(window, BACKGROUND_COLOR);
-	 
-	 setup_time_date_layers();
-	 
-	 if (SHOW_TEXT_TIME && time_layer_exists) text_layer_set_text(text_time_layer, time_text);
-	 if (SHOW_TEXT_DATE && date_layer_exists)
-	 {
-		 if (ROW_DATE)
-		 {
-		  text_layer_set_text(text_date_layer, date_row_text);
-		 } else {
-		  text_layer_set_text(text_date_layer, date_text);
-		 }
-	 }
- }
-
-
- void in_dropped_handler(AppMessageResult reason, void *context) {
-   // incoming message dropped
- }
-
-
-static void init(void) {
-  //(void)ctx;
+static void show_text(struct tm *tick_time)
+{ 
+	int mode = get_show_mode_value();
+	if (mode == SHOW_DATE || mode == SHOW_DATE_STAT)
+	{
+		if(is_stat_showing == true) layer_set_status(text_date_layer);
+		else layer_set_date(text_date_layer);
+	}
 	
-  app_message_register_inbox_received(in_received_handler);
-  app_message_register_inbox_dropped(in_dropped_handler);
-  app_message_open(64, 0);
-
-  if(persist_exists(KEY_TIME)) SHOW_TEXT_TIME = persist_read_bool(KEY_TIME);
-  if(persist_exists(KEY_DATE)) SHOW_TEXT_DATE = persist_read_bool(KEY_DATE);
-  if(persist_exists(KEY_ROW)) ROW_DATE = persist_read_bool(KEY_ROW);
-  if(persist_exists(KEY_INVERT)) INVERT = persist_read_bool(KEY_INVERT);
+	if (mode == SHOW_STAT || mode == SHOW_DATE_STAT)
+	{
+		if(is_stat_showing == true) layer_set_date(text_status_layer);
+		else layer_set_status(text_status_layer);
+	}
 	
-  if(INVERT) {
-	  BACKGROUND_COLOR = GColorWhite;
-	  FOREGROUND_COLOR = GColorBlack;
-  }
-  else {
-	  BACKGROUND_COLOR = GColorBlack;
-	  FOREGROUND_COLOR = GColorWhite;		 		 
-  }
-	
-  window = window_create();
-  window_set_background_color(window, BACKGROUND_COLOR);
-  window_stack_push(window, true);
-
-  // No longer needed for SDK 2.0
-  //resource_init_current_app(&APP_RESOURCES);
-	
-  Layer *window_layer = window_get_root_layer(window);
-  GRect bounds = layer_get_bounds(window_layer);
-	
-  // Init the layer for the minute display
-  minute_display_layer = layer_create(bounds);
-  layer_set_update_proc(minute_display_layer, minute_display_layer_update_callback);
-  layer_add_child(window_layer, minute_display_layer);
-
-  // Init the minute segment path
-  minute_segment_path = gpath_create(&MINUTE_SEGMENT_PATH_POINTS);
-  gpath_move_to(minute_segment_path, grect_center_point(&bounds));
-
-  // Init the layer for the hour display
-  hour_display_layer = layer_create(bounds);
-  layer_set_update_proc(hour_display_layer, hour_display_layer_update_callback);
-  layer_add_child(window_layer, hour_display_layer);
-
-  // Init the hour segment path
-  hour_segment_path = gpath_create(&HOUR_SEGMENT_PATH_POINTS);
-  gpath_move_to(hour_segment_path, grect_center_point(&bounds));
-
-  setup_time_date_layers();
-	
-  tick_timer_service_subscribe(MINUTE_UNIT, handle_minute_tick);
+	if(mode == SHOW_NONE)
+	{	
+		layer_set_hidden(text_layer_get_layer(text_status_layer), (is_stat_showing == false));
+		layer_set_hidden(text_layer_get_layer(text_date_layer), (is_stat_showing == false));
+		
+		if(is_stat_showing == true)
+		{
+			layer_set_date(text_date_layer);
+			layer_set_status(text_status_layer);
+		}
+	}
 }
 
-static void deinit(void) {
-  gpath_destroy(minute_segment_path);
-  gpath_destroy(hour_segment_path);
-
-  tick_timer_service_unsubscribe();
-  window_destroy(window);
-  layer_destroy(minute_display_layer);
-  layer_destroy(hour_display_layer);
+static void handle_timer(void *data)
+{
+	timer = NULL;
+	is_stat_showing = false;
 	
-  if (time_layer_exists) text_layer_destroy(text_time_layer);
-  if (date_layer_exists) text_layer_destroy(text_date_layer);
+	time_t now = time(NULL);
+	struct tm *t = localtime(&now);
+	show_text(t);
 }
 
-int main(void) {
-  init();
-  app_event_loop();
-  deinit();
+static void handle_tap(AccelAxisType axis, int32_t direction)
+{
+	int mode = get_show_mode_value();
+	if(mode == SHOW_DATE_STAT) return; //the date and status are already shown so tapping doesn't do anything
+	
+	if(is_stat_showing == true) return;
+	is_stat_showing = true;
+	
+	time_t now = time(NULL);
+	struct tm *t = localtime(&now);
+	show_text(t);
+	
+	timer = app_timer_register(1500, handle_timer, NULL);
+}
+
+static void hour_display_layer_update_callback(Layer *layer, GContext* ctx) 
+{
+	time_t now = time(NULL);
+	struct tm *t = localtime(&now);
+	bool am = (t->tm_hour < 12);
+	
+	unsigned int angle = (( t->tm_hour % 12 ) * 30) + (t->tm_min / 2);
+	angle = angle - (angle % 6);
+	
+	GRect bounds = layer_get_bounds(layer);
+	GPoint center = grect_center_point(&bounds);
+	
+	graphics_context_set_fill_color(ctx, GColorWhite);
+	graphics_fill_circle(ctx, center, 55);
+	graphics_context_set_fill_color(ctx, GColorBlack);
+	
+	gpath_move_to(hour_segment_path, grect_center_point(&bounds));
+	if(am)
+	{
+		for(; angle < 355; angle += 6)
+		{
+			gpath_rotate_to(hour_segment_path, (TRIG_MAX_ANGLE / 360) * angle);
+			gpath_draw_filled(ctx, hour_segment_path);
+		}
+	}
+	else
+	{
+		unsigned int other_angle;
+		for(other_angle = 0; other_angle < angle; other_angle += 6)
+		{
+			gpath_rotate_to(hour_segment_path, (TRIG_MAX_ANGLE / 360) * other_angle);
+			gpath_draw_filled(ctx, hour_segment_path);
+		}
+	}
+	
+	graphics_fill_circle(ctx, center, 50);
+}
+
+static void handle_minute_tick(struct tm *tick_time, TimeUnits units_changed)
+{
+	determine_invert_status(tick_time);
+	
+	layer_mark_dirty(minute_display_layer);
+	layer_mark_dirty(hour_display_layer);
+	layer_mark_dirty(inverter_layer_get_layer(inverter));
+	
+	if(is_stat_showing == false) show_text(tick_time);
+}
+
+static void setup_layers() 
+{
+	Layer *window_layer = window_get_root_layer(window);
+	Layer *inverter_layer = inverter_layer_get_layer(inverter);
+	GRect bounds = layer_get_bounds(window_layer);
+	
+	int mode = get_show_mode_value();
+	if(text_date_layer != NULL) text_layer_destroy(text_date_layer);
+	if(text_status_layer != NULL) text_layer_destroy(text_status_layer);
+	
+	if (mode == SHOW_DATE || mode == SHOW_DATE_STAT || mode == SHOW_NONE)
+	{
+		text_date_layer = text_layer_create(bounds);
+		text_layer_set_text_color(text_date_layer, GColorWhite);
+		text_layer_set_background_color(text_date_layer, GColorClear);
+		text_layer_set_text_alignment(text_date_layer, GTextAlignmentCenter);
+		
+		text_layer_set_font(text_date_layer, font);
+		layer_insert_below_sibling(text_layer_get_layer(text_date_layer), inverter_layer);
+		
+		if (mode == SHOW_DATE_STAT || mode == SHOW_NONE) 
+			layer_set_frame(text_layer_get_layer(text_date_layer), GRect(0, 57, 144, 168-57));
+		else 
+			layer_set_frame(text_layer_get_layer(text_date_layer), GRect(0, 70, 144, 168-70));	  
+	}
+	
+	if (mode == SHOW_STAT || mode == SHOW_DATE_STAT || mode == SHOW_NONE)
+	{
+		text_status_layer = text_layer_create(bounds);
+		text_layer_set_text_color(text_status_layer, GColorWhite);
+		text_layer_set_background_color(text_status_layer, GColorClear);
+		text_layer_set_text_alignment(text_status_layer, GTextAlignmentCenter);
+		
+		text_layer_set_font(text_status_layer, font);
+		layer_insert_below_sibling(text_layer_get_layer(text_status_layer), inverter_layer);
+		
+		if (mode == SHOW_DATE_STAT || mode == SHOW_NONE) 
+			layer_set_frame(text_layer_get_layer(text_status_layer), GRect(0, 80, 144, 168-80));
+		else 
+			layer_set_frame(text_layer_get_layer(text_status_layer), GRect(0, 70, 144, 168-70));
+	}
+}
+
+static void field_changed(const uint32_t key, const void *old_value, const void *new_value)
+{
+	time_t now = time(NULL);
+	struct tm *t = localtime(&now);
+	
+	if(key == CONFIG_KEY_INVERTMODE)
+	{
+		determine_invert_status(t);
+	}
+	else if(key == CONFIG_KEY_SHOWMODE)
+	{
+		setup_layers();
+		show_text(t);
+	}
+}
+
+static void face_init()
+{
+	Layer *window_layer = window_get_root_layer(window);
+	Layer *inverter_layer = inverter_layer_get_layer(inverter);
+	GRect bounds = layer_get_bounds(window_layer);
+	
+	// Init the layer for the minute display
+	minute_display_layer = layer_create(bounds);
+	layer_set_update_proc(minute_display_layer, minute_display_layer_update_callback);
+	layer_insert_below_sibling(minute_display_layer, inverter_layer);
+	
+	// Init the minute segment path
+	minute_segment_path = gpath_create(&MINUTE_SEGMENT_PATH_POINTS);
+	gpath_move_to(minute_segment_path, grect_center_point(&bounds));
+	
+	// Init the layer for the hour display
+	hour_display_layer = layer_create(bounds);
+	layer_set_update_proc(hour_display_layer, hour_display_layer_update_callback);
+	layer_insert_below_sibling(hour_display_layer, inverter_layer);
+	
+	// Init the hour segment path
+	hour_segment_path = gpath_create(&HOUR_SEGMENT_PATH_POINTS);
+	gpath_move_to(hour_segment_path, grect_center_point(&bounds));
+	
+	setup_layers();
+	
+	time_t now = time(NULL);
+	struct tm *t = localtime(&now);
+	show_text(t);
+	
+	tick_timer_service_subscribe(MINUTE_UNIT, handle_minute_tick);
+	accel_tap_service_subscribe(handle_tap);
+}
+
+static void inverter_init()
+{
+	time_t now = time(NULL);
+	struct tm *t = localtime(&now);
+	inverter = inverter_layer_create(GRect(0, 0, SCREEN_WIDTH, 0));
+	layer_add_child(window_get_root_layer(window), inverter_layer_get_layer(inverter));
+	determine_invert_status(t);
+}
+
+static void init(void) 
+{	
+	is_stat_showing = false;
+	font = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_IMAGINE_20));
+	sym_font = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_SYMBOLS_25));
+	
+	window = window_create();
+	window_set_background_color(window, GColorBlack);
+	window_stack_push(window, true);
+	
+	thincfg_init();
+    thincfg_subscribe((ThinCFGCallbacks) { .field_changed = field_changed, });
+	
+	inverter_init();
+	btmonitor_init();
+	
+	face_init();
+}
+
+static void deinit(void)
+{
+	gpath_destroy(minute_segment_path);
+	gpath_destroy(hour_segment_path);
+	
+	tick_timer_service_unsubscribe();
+	
+	layer_remove_from_parent(inverter_layer_get_layer(inverter));
+	inverter_layer_destroy(inverter);
+	free(inverter);
+	
+	window_destroy(window);
+	layer_destroy(minute_display_layer);
+	layer_destroy(hour_display_layer);
+	
+	if(text_status_layer != NULL) text_layer_destroy(text_status_layer);
+	if(text_date_layer != NULL) text_layer_destroy(text_date_layer);
+	
+	fonts_unload_custom_font(font);
+	fonts_unload_custom_font(sym_font);
+	
+	accel_data_service_unsubscribe();
+}
+
+int main(void)
+{
+	init();
+	app_event_loop();
+	deinit();
 }
