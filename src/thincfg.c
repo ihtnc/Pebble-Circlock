@@ -90,9 +90,9 @@ static void in_dropped_handler(AppMessageResult reason, void *context)
 static void in_received_handler(DictionaryIterator *received, void *context) 
 {
 	Tuple *imode = dict_find(received, CONFIG_KEY_INVERTMODE);
-	if(imode) 
+	if(imode != NULL) 
 	{
-		persist_write_int(CONFIG_KEY_INVERTMODE, imode->value->int32);
+		persist_write_bool(CONFIG_KEY_INVERTMODE, (imode->value->int32 == 1));
 		invert_mode = (imode->value->int32 == 1);
 		
 		#ifdef ENABLE_LOGGING
@@ -110,6 +110,7 @@ static void in_received_handler(DictionaryIterator *received, void *context)
 		APP_LOG(APP_LOG_LEVEL_DEBUG, "in_received_handler: invert_mode=false");
 		#endif
 	}
+	dict_read_first(received);
 	
 	if(old_invert_mode != invert_mode && cfgcallbacks.field_changed)
 	{
@@ -118,9 +119,9 @@ static void in_received_handler(DictionaryIterator *received, void *context)
 	old_invert_mode = invert_mode;
 	
 	Tuple *bt = dict_find(received, CONFIG_KEY_BTNOTIFICATION);
-	if(bt) 
+	if(bt != NULL) 
 	{
-		persist_write_int(CONFIG_KEY_BTNOTIFICATION, bt->value->int32);
+		persist_write_bool(CONFIG_KEY_BTNOTIFICATION, (bt->value->int32 == 1));
 		bt_notification = (bt->value->int32 == 1);
 		
 		#ifdef ENABLE_LOGGING
@@ -138,7 +139,8 @@ static void in_received_handler(DictionaryIterator *received, void *context)
 			APP_LOG(APP_LOG_LEVEL_DEBUG, "in_received_handler: bt_notification=false");
 		#endif
     }
-
+	dict_read_first(received);
+	
     if(old_bt_notification != bt_notification && cfgcallbacks.field_changed)
     {
         cfgcallbacks.field_changed(CONFIG_KEY_BTNOTIFICATION, (void *)&old_bt_notification, (void *)&bt_notification);
@@ -146,9 +148,9 @@ static void in_received_handler(DictionaryIterator *received, void *context)
     old_bt_notification = bt_notification;
 	
 	Tuple *smode = dict_find(received, CONFIG_KEY_SHOWMODE);
-	if(smode) 
+	if(smode != NULL) 
 	{
-		persist_write_int(CONFIG_KEY_SHOWMODE, smode->value->int32);
+		persist_write_int(CONFIG_KEY_SHOWMODE, (int)smode->value->int32);
 		show_mode = (int)smode->value->int32;
 		
 		#ifdef ENABLE_LOGGING
@@ -157,6 +159,7 @@ static void in_received_handler(DictionaryIterator *received, void *context)
 		APP_LOG(APP_LOG_LEVEL_DEBUG, output);
 		#endif
 	}
+	dict_read_first(received);
 	
 	if(old_show_mode != show_mode && cfgcallbacks.field_changed)
 	{

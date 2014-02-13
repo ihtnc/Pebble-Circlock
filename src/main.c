@@ -49,12 +49,11 @@ const GPathInfo HOUR_SEGMENT_PATH_POINTS =
 
 static AppTimer *timer;
 
-static void determine_invert_status(struct tm *tick_time)
+static void determine_invert_status()
 {
-	bool invert;
-	
-	invert = (tick_time->tm_hour < 12) && false;
+	bool invert = get_invert_mode_value();
 	layer_set_frame(inverter_layer_get_layer(inverter), GRect(0, 0, SCREEN_WIDTH, (invert ? SCREEN_HEIGHT : 0)));
+	layer_mark_dirty(inverter_layer_get_layer(inverter));
 }
 
 static void minute_display_layer_update_callback(Layer *layer, GContext* ctx) 
@@ -202,7 +201,7 @@ static void hour_display_layer_update_callback(Layer *layer, GContext* ctx)
 
 static void handle_minute_tick(struct tm *tick_time, TimeUnits units_changed)
 {
-	determine_invert_status(tick_time);
+	determine_invert_status();
 	
 	layer_mark_dirty(minute_display_layer);
 	layer_mark_dirty(hour_display_layer);
@@ -256,15 +255,20 @@ static void setup_layers()
 
 static void field_changed(const uint32_t key, const void *old_value, const void *new_value)
 {
-	time_t now = time(NULL);
-	struct tm *t = localtime(&now);
+	#ifdef ENABLE_LOGGING
+	char *output = "field_changed: key=XXX";
+	snprintf(output, strlen(output), "field_changed: key=%d", (int) key);
+	APP_LOG(APP_LOG_LEVEL_DEBUG, output);
+	#endif
 	
 	if(key == CONFIG_KEY_INVERTMODE)
 	{
-		determine_invert_status(t);
+		determine_invert_status();
 	}
 	else if(key == CONFIG_KEY_SHOWMODE)
 	{
+		time_t now = time(NULL);
+		struct tm *t = localtime(&now);
 		setup_layers();
 		show_text(t);
 	}

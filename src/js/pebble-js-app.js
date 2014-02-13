@@ -1,4 +1,4 @@
-var enable_logging = false;
+var enable_logging = true;
 var invert = 0;
 var bt = 0;
 var show = 0;
@@ -101,20 +101,20 @@ Pebble.addEventListener("webviewclosed", function(e) {
 	
 	if(enable_logging) console.log("Pebble.webviewclosed: action=save");
 	
-	if(configuration.InvertMode === null) invert = 0;
+	if(configuration.InvertMode == null) invert = "0";
 	else invert = configuration.InvertMode;
 	
 	localStorage.setItem("InvertMode", invert);
 	if(enable_logging) console.log("Pebble.webviewclosed: mode=" + invert);
 	
-	if(configuration.ShowMode === null) show = 0;
+	if(configuration.ShowMode == null) show = "0";
 	else show = configuration.ShowMode;
 	
 	localStorage.setItem("ShowMode", show);
 	if(enable_logging) console.log("Pebble.webviewclosed: show=" + show);
 	
 	
-	if(configuration.BTNotification === null) bt = 0;
+	if(configuration.BTNotification == null) bt = "0";
 	else bt = configuration.BTNotification;
 	
 	localStorage.setItem("BTNotification", bt);

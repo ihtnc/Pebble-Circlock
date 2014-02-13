@@ -2,10 +2,10 @@
     "versionLabel": "1.0",
     "uuid": "00884a5c-9150-4f28-845d-9fa9aec46123",
     "appKeys": {
-        "Action": 29073,
-        "BTNotification": 29071,
-        "ShowMode": 29072,
-        "InvertMode": 29070
+        "Action": 73,
+        "BTNotification": 71,
+        "ShowMode": 72,
+        "InvertMode": 70
     },
     "longName": "Circlock",
     "versionCode": 2,
@@ -23,7 +23,7 @@
                 "characterRegex": "[\\+\\`\\$\\%\\?\\&\\s]",
                 "type": "font",
                 "name": "FONT_SYMBOLS_25",
-                "file": "fonts/OrangeKid-Mod.ttf"
+                "file": "fonts/symbols.ttf"
             },
             {
                 "characterRegex": "[A-Za-z0-9\\s]",

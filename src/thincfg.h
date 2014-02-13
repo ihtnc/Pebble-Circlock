@@ -1,20 +1,17 @@
-#include "pebble.h"
-
 #ifndef THINCFG
 #define THINCFG
+
+#include "pebble.h"
 
 #define SHOW_NONE 0
 #define SHOW_DATE 1
 #define SHOW_STAT 2
 #define SHOW_DATE_STAT 3
-	
-enum 
-{
-	CONFIG_KEY_INVERTMODE = 29070,
-	CONFIG_KEY_BTNOTIFICATION = 29071,
-	CONFIG_KEY_SHOWMODE = 29072,
-	CONFIG_KEY_ACTION = 29073
-};
+
+#define CONFIG_KEY_INVERTMODE 70
+#define CONFIG_KEY_BTNOTIFICATION 71
+#define CONFIG_KEY_SHOWMODE 72
+#define CONFIG_KEY_ACTION 73
 
 typedef void(*ThinCFGFieldChangedHandler)(const uint32_t key, const void *old_value, const void *new_value);
 
