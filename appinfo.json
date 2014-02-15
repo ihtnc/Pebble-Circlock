@@ -2,10 +2,10 @@
     "versionLabel": "1.0",
     "uuid": "00884a5c-9150-4f28-845d-9fa9aec46123",
     "appKeys": {
-        "Action": 73,
-        "BTNotification": 71,
+        "BTNotification": 73,
         "ShowMode": 72,
-        "InvertMode": 70
+        "InvertMode": 71,
+        "ShowSplash": 70
     },
     "longName": "Circlock",
     "versionCode": 2,

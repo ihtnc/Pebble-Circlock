@@ -3,9 +3,10 @@
  */
 
 #include "main.h"
-#include "btmonitor.h"
-#include "thincfg.h"
 #include "options.h"
+#include "thincfg.h"
+#include "btmonitor.h"
+#include "splasher.h"
 
 static char date_text[] = "XXX 00";
 static char status_text[] = "X X";
@@ -308,6 +309,13 @@ static void face_init()
 	accel_tap_service_subscribe(handle_tap);
 }
 
+static void inverter_deinit()
+{
+	layer_remove_from_parent(inverter_layer_get_layer(inverter));
+	inverter_layer_destroy(inverter);
+	free(inverter);
+}
+
 static void inverter_init()
 {
 	time_t now = time(NULL);
@@ -315,6 +323,16 @@ static void inverter_init()
 	inverter = inverter_layer_create(GRect(0, 0, SCREEN_WIDTH, 0));
 	layer_add_child(window_get_root_layer(window), inverter_layer_get_layer(inverter));
 	determine_invert_status(t);
+}
+
+static void splash_init()
+{
+	splasher_stop();
+}
+
+static void splash_deinit()
+{
+	face_init();
 }
 
 static void init(void) 
@@ -333,7 +351,8 @@ static void init(void)
 	inverter_init();
 	btmonitor_init();
 	
-	face_init();
+	splasher_init((SplasherCallbacks) { .splash_init = splash_init, .splash_deinit = splash_deinit });
+	splasher_start();
 }
 
 static void deinit(void)
@@ -343,9 +362,10 @@ static void deinit(void)
 	
 	tick_timer_service_unsubscribe();
 	
-	layer_remove_from_parent(inverter_layer_get_layer(inverter));
-	inverter_layer_destroy(inverter);
-	free(inverter);
+	inverter_deinit();
+	thincfg_deinit();
+	btmonitor_deinit();
+	splasher_deinit();
 	
 	window_destroy(window);
 	layer_destroy(minute_display_layer);
@@ -358,6 +378,8 @@ static void deinit(void)
 	fonts_unload_custom_font(sym_font);
 	
 	accel_data_service_unsubscribe();
+	
+	thincfg_deinit();
 }
 
 int main(void)

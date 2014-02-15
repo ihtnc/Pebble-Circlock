@@ -1,4 +1,4 @@
-var enable_logging = true;
+var enable_logging = false;
 var invert = 0;
 var bt = 0;
 var show = 0;

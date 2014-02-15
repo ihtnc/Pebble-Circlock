@@ -43,7 +43,7 @@ static void app_timer_callback(void *context)
 			}
 			
 			#ifdef ENABLE_LOGGING
-				char *output = "app_timer_callback: callback on=XXX minute(s)";
+			char *output = "app_timer_callback: callback on=XXX minute(s)";
 			snprintf(output, strlen(output), "app_timer_callback: callback on=%d minute(s)", vibe_freq[vibe_index]);
 			APP_LOG(APP_LOG_LEVEL_DEBUG, output);
 			#endif
@@ -112,9 +112,9 @@ void btmonitor_subscribe(BTMonitorCallbacks callbacks)
 	btcallbacks = callbacks;
 }
 
-
 void btmonitor_init(void) 
-{                
+{   
+	thincfg_init();
 	bluetooth_connection_callback(bluetooth_connection_service_peek());        
 	bluetooth_connection_service_subscribe(bluetooth_connection_callback);
 }
