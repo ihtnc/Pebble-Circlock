@@ -15,12 +15,12 @@ static int old_show_mode;
 
 static ThinCFGCallbacks cfgcallbacks;
 
-bool get_show_splash_value(void) { return show_splash; }
-bool get_invert_mode_value(void) { return invert_mode; }
-bool get_bt_notification_value(void) { return bt_notification; }
-int get_show_mode_value(void) { return show_mode; }
+bool thincfg_get_show_splash_value(void) { return show_splash; }
+bool thincfg_get_invert_mode_value(void) { return invert_mode; }
+bool thincfg_get_bt_notification_value(void) { return bt_notification; }
+int thincfg_get_show_mode_value(void) { return show_mode; }
 
-void set_show_splash_value(const bool value) 
+void thincfg_set_show_splash_value(const bool value) 
 {
 	show_splash = value; 
 	if(old_show_splash != show_splash && cfgcallbacks.field_changed)
@@ -29,10 +29,18 @@ void set_show_splash_value(const bool value)
 	}
 	old_invert_mode = show_splash;
 	
-	persist_write_bool(CONFIG_KEY_SHOWSPLASH, value); 
+	int32_t retval = persist_write_bool(CONFIG_KEY_SHOWSPLASH, value); 
+	if(retval == 0) {}
+	
+	#ifdef ENABLE_LOGGING
+	char *output = "thincfg_set_show_splash_value: key=XXXXX; return=XXXXX; value=false";
+	if(value) snprintf(output, strlen(output), "thincfg_set_show_splash_value: key=%d; return=%d; value=true", (int)CONFIG_KEY_SHOWSPLASH, (int)retval);
+	else snprintf(output, strlen(output), "thincfg_set_show_splash_value: key=%d; return=%d; value=false", (int)CONFIG_KEY_SHOWSPLASH, (int)retval);
+	APP_LOG(APP_LOG_LEVEL_DEBUG, output);
+	#endif
 }
 
-void set_invert_mode_value(const bool value) 
+void thincfg_set_invert_mode_value(const bool value) 
 {
 	invert_mode = value; 
 	if(old_invert_mode != invert_mode && cfgcallbacks.field_changed)
@@ -41,10 +49,18 @@ void set_invert_mode_value(const bool value)
 	}
 	old_invert_mode = invert_mode;
 	
-	persist_write_bool(CONFIG_KEY_INVERTMODE, value); 
+	int32_t retval = persist_write_bool(CONFIG_KEY_INVERTMODE, value); 
+	if(retval == 0) {}
+	
+	#ifdef ENABLE_LOGGING
+	char *output = "thincfg_set_invert_mode_value: key=XXXXX; return=XXXXX; value=false";
+	if(value) snprintf(output, strlen(output), "thincfg_set_invert_mode_value: key=%d; return=%d; value=true", (int)CONFIG_KEY_SHOWSPLASH, (int)retval);
+	else snprintf(output, strlen(output), "thincfg_set_invert_mode_value: key=%d; return %d; value=false", (int)CONFIG_KEY_SHOWSPLASH, (int)retval);
+	APP_LOG(APP_LOG_LEVEL_DEBUG, output);
+	#endif
 }
 
-void set_bt_notification_value(const bool value) 
+void thincfg_set_bt_notification_value(const bool value) 
 {
 	bt_notification = value;
 	if(old_bt_notification != bt_notification && cfgcallbacks.field_changed)
@@ -53,10 +69,18 @@ void set_bt_notification_value(const bool value)
     }
     old_bt_notification = bt_notification;
 	
-	persist_write_bool(CONFIG_KEY_BTNOTIFICATION, value); 
+	int32_t retval = persist_write_bool(CONFIG_KEY_BTNOTIFICATION, value); 
+	if(retval == 0) {}
+	
+	#ifdef ENABLE_LOGGING
+	char *output = "thincfg_set_bt_notification_value: key=XXXXX; return=XXXXX; value=false";
+	if(value) snprintf(output, strlen(output), "thincfg_set_bt_notification_value: key=%d; return=%d; value=true", (int)CONFIG_KEY_BTNOTIFICATION, (int)retval);
+	else snprintf(output, strlen(output), "thincfg_set_bt_notification_value: key=%d; return=%d; value=false", (int)CONFIG_KEY_BTNOTIFICATION, (int)retval);
+	APP_LOG(APP_LOG_LEVEL_DEBUG, output);
+	#endif
 }
 
-void set_show_mode_value(const int value)
+void thincfg_set_show_mode_value(const int value)
 {
 	show_mode = value; 
 	
@@ -66,7 +90,14 @@ void set_show_mode_value(const int value)
 	}
 	old_show_mode = show_mode;
 	
-	persist_write_int(CONFIG_KEY_SHOWMODE, value); 
+	int32_t retval = persist_write_int(CONFIG_KEY_SHOWMODE, value); 
+	if(retval == 0) {}
+	
+	#ifdef ENABLE_LOGGING
+	char *output = "thincfg_set_show_mode_value: key=XXXXX; return=XXXXX; value=false";
+	snprintf(output, strlen(output), "thincfg_set_show_mode_value: key=%d; return=%d; value=%d", (int)CONFIG_KEY_SHOWMODE, (int)retval, value);
+	APP_LOG(APP_LOG_LEVEL_DEBUG, output);
+	#endif
 }
 
 static void read_config(void) 
@@ -181,7 +212,7 @@ static void in_received_handler(DictionaryIterator *received, void *context)
 		APP_LOG(APP_LOG_LEVEL_DEBUG, "in_received_handler: invert_mode=false");
 		#endif
 	}
-	set_invert_mode_value(invert_mode);
+	thincfg_set_invert_mode_value(invert_mode);
 	dict_read_first(received);
 		
 	Tuple *bt = dict_find(received, CONFIG_KEY_BTNOTIFICATION);
@@ -203,7 +234,7 @@ static void in_received_handler(DictionaryIterator *received, void *context)
 		APP_LOG(APP_LOG_LEVEL_DEBUG, "in_received_handler: bt_notification=false");
 		#endif
     }
-    set_bt_notification_value(bt_notification);
+    thincfg_set_bt_notification_value(bt_notification);
 	dict_read_first(received);
 	
 	Tuple *smode = dict_find(received, CONFIG_KEY_SHOWMODE);
@@ -226,7 +257,29 @@ static void in_received_handler(DictionaryIterator *received, void *context)
 			APP_LOG(APP_LOG_LEVEL_DEBUG, "in_received_handler: show_mode=0");
 		#endif
     }
-	set_show_mode_value(show_mode);
+	thincfg_set_show_mode_value(show_mode);
+	dict_read_first(received);
+	
+	Tuple *splash = dict_find(received, CONFIG_KEY_SHOWSPLASH);
+	if(splash != NULL) 
+	{
+		show_splash = (splash->value->int32 == 1);
+		
+		#ifdef ENABLE_LOGGING
+		if(show_splash == true) APP_LOG(APP_LOG_LEVEL_DEBUG, "in_received_handler: show_splash=true");
+		else APP_LOG(APP_LOG_LEVEL_DEBUG, "in_received_handler: show_splash=false");
+		#endif
+	}
+	else
+	{
+		//since thinCFG won't pass fields that are not selected, we set the show_splash to false if its key is not returned
+		show_splash = false;
+		
+		#ifdef ENABLE_LOGGING
+		APP_LOG(APP_LOG_LEVEL_DEBUG, "in_received_handler: show_splash=false");
+		#endif
+    }
+    thincfg_set_show_splash_value(show_splash);
 	dict_read_first(received);	
 }
 
@@ -252,6 +305,39 @@ void thincfg_init(void)
 	if(do_init == true)
 	{
 		app_message_init();
+
+		#ifdef RESET_SETTINGS
+			int32_t retval = 0;
+			retval = persist_delete(CONFIG_KEY_SHOWSPLASH); 
+			
+			#ifdef ENABLE_LOGGING
+			char *output_splash = "thincfg_init: deleting key=XXXXX; return=XXXXX";
+			snprintf(output_splash, strlen(output_splash), "thincfg_init: deleting key=%d; return=%d", (int)CONFIG_KEY_SHOWSPLASH, (int)retval);
+			APP_LOG(APP_LOG_LEVEL_DEBUG, output_splash);
+			#endif
+			
+			retval = persist_delete(CONFIG_KEY_INVERTMODE); 
+			#ifdef ENABLE_LOGGING
+			char *output_invert = "thincfg_init: deleting key=XXXXX; return=XXXXX";
+			snprintf(output_invert, strlen(output_invert), "thincfg_init: deleting key=%d; return=%d", (int)CONFIG_KEY_INVERTMODE, (int)retval);
+			APP_LOG(APP_LOG_LEVEL_DEBUG, output_invert);
+			#endif
+			
+			retval = persist_delete(CONFIG_KEY_BTNOTIFICATION); 
+			#ifdef ENABLE_LOGGING
+			char *output_bt = "thincfg_init: deleting key=XXXXX; return=XXXXX";
+			snprintf(output_bt, strlen(output_bt), "thincfg_init: deleting key=%d; return=%d", (int)CONFIG_KEY_BTNOTIFICATION, (int)retval);
+			APP_LOG(APP_LOG_LEVEL_DEBUG, output_bt);
+			#endif
+		
+			retval = persist_delete(CONFIG_KEY_SHOWMODE); 
+			#ifdef ENABLE_LOGGING
+			char *output_mode = "thincfg_init: deleting key=XXXXX; return=XXXXX";
+			snprintf(output_mode, strlen(output_mode), "thincfg_init: deleting key=%d; return=%d", (int)CONFIG_KEY_SHOWMODE, (int)retval);
+			APP_LOG(APP_LOG_LEVEL_DEBUG, output_mode);
+			#endif
+		#endif
+
 		read_config();
 		do_init = false;
 	}
@@ -259,5 +345,51 @@ void thincfg_init(void)
 
 void thincfg_deinit(void)
 {
-    app_message_deregister_callbacks();
+	int32_t retval = 0;
+	if(persist_exists(CONFIG_KEY_SHOWSPLASH) == false)
+	{
+		retval = persist_write_bool(CONFIG_KEY_SHOWSPLASH, show_splash); 
+		
+		#ifdef ENABLE_LOGGING
+		char *output_splash = "thincfg_deinit: saving key=XXXXX; return=XXXXX; value=false";
+		if(show_splash) snprintf(output_splash, strlen(output_splash), "thincfg_deinit: saving key=%d; return=%d; value=true", (int)CONFIG_KEY_SHOWSPLASH, (int)retval);
+		else snprintf(output_splash, strlen(output_splash), "thincfg_deinit: saving key=%d; return=%d; value=false", (int)CONFIG_KEY_SHOWSPLASH, (int)retval);
+		APP_LOG(APP_LOG_LEVEL_DEBUG, output_splash);
+		#endif
+	}
+	
+	if(persist_exists(CONFIG_KEY_INVERTMODE) == false)
+	{
+		retval = persist_write_bool(CONFIG_KEY_INVERTMODE, invert_mode); 
+		#ifdef ENABLE_LOGGING
+		char *output_invert = "thincfg_deinit: saving key=XXXXX; return=XXXXX; value=false";
+		if(invert_mode) snprintf(output_invert, strlen(output_invert), "thincfg_deinit: saving key=%d; return=%d; value=true", (int)CONFIG_KEY_INVERTMODE, (int)retval);
+		else snprintf(output_invert, strlen(output_invert), "thincfg_deinit: saving key=%d; return=%d; value=false", (int)CONFIG_KEY_INVERTMODE, (int)retval);
+		APP_LOG(APP_LOG_LEVEL_DEBUG, output_invert);
+		#endif
+	}
+	
+	if(persist_exists(CONFIG_KEY_BTNOTIFICATION) == false)
+	{
+		retval = persist_write_bool(CONFIG_KEY_BTNOTIFICATION, bt_notification); 
+		#ifdef ENABLE_LOGGING
+		char *output_bt = "thincfg_deinit: saving key=XXXXX; return=XXXXX; value=false";
+		if(bt_notification) snprintf(output_bt, strlen(output_bt), "thincfg_deinit: saving key=%d; return=%d; value=true", (int)CONFIG_KEY_BTNOTIFICATION, (int)retval);
+		else snprintf(output_bt, strlen(output_bt), "thincfg_deinit: saving key=%d; return=%d; value=false", (int)CONFIG_KEY_BTNOTIFICATION, (int)retval);
+		APP_LOG(APP_LOG_LEVEL_DEBUG, output_bt);
+		#endif
+	}
+	
+	if(persist_exists(CONFIG_KEY_SHOWMODE) == false)
+	{
+		retval = persist_write_int(CONFIG_KEY_SHOWMODE, show_mode); 
+		#ifdef ENABLE_LOGGING
+		char *output_mode = "thincfg_deinit: saving key=XXXXX; return=XXXXX; value=false";
+		snprintf(output_mode, strlen(output_mode), "thincfg_deinit: saving key=%d; return=%d; value=%d", (int)CONFIG_KEY_SHOWMODE, (int)retval, show_mode);
+		APP_LOG(APP_LOG_LEVEL_DEBUG, output_mode);
+		#endif
+	}
+	
+	app_message_deregister_callbacks();
+	if(retval == 0) {}
 }

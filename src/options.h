@@ -2,3 +2,4 @@
 
 //#define DEBUG
 //#define ENABLE_LOGGING
+//#define RESET_SETTINGS

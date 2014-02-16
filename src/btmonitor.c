@@ -25,7 +25,7 @@ static void app_timer_callback(void *context)
 {
 	timer = NULL;
 	vibe_index++;
-	bool needs_vibrate = get_bt_notification_value();
+	bool needs_vibrate = thincfg_get_bt_notification_value();
 	is_connected = bluetooth_connection_service_peek();
 	
 	if(is_connected == false)
@@ -60,7 +60,7 @@ static void app_timer_callback(void *context)
         
 static void bluetooth_connection_callback(bool connected)
 {
-	bool needs_vibrate = get_bt_notification_value();
+	bool needs_vibrate = thincfg_get_bt_notification_value();
 	is_connected = connected;
 	vibe_index = 0;
 	
@@ -104,7 +104,8 @@ static void bluetooth_connection_callback(bool connected)
 
 void btmonitor_unsubscribe(void)
 {
-	//
+	btcallbacks.ping = NULL;
+	btcallbacks.status_changed = NULL;
 }
 
 void btmonitor_subscribe(BTMonitorCallbacks callbacks)
@@ -114,7 +115,6 @@ void btmonitor_subscribe(BTMonitorCallbacks callbacks)
 
 void btmonitor_init(void) 
 {   
-	thincfg_init();
 	bluetooth_connection_callback(bluetooth_connection_service_peek());        
 	bluetooth_connection_service_subscribe(bluetooth_connection_callback);
 }

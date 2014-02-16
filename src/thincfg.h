@@ -19,15 +19,15 @@ typedef struct {
         ThinCFGFieldChangedHandler field_changed;
 } ThinCFGCallbacks;
 
-bool get_show_splash_value(void);
-bool get_invert_mode_value(void);
-bool get_bt_notification_value(void);
-int get_show_mode_value(void);
+bool thincfg_get_show_splash_value(void);
+bool thincfg_get_invert_mode_value(void);
+bool thincfg_get_bt_notification_value(void);
+int thincfg_get_show_mode_value(void);
 
-void set_show_splash_value(const bool value);
-void set_invert_mode_value(const bool value);
-void set_bt_notification_value(const bool value);
-void set_show_mode_value(const int value);
+void thincfg_set_show_splash_value(const bool value);
+void thincfg_set_invert_mode_value(const bool value);
+void thincfg_set_bt_notification_value(const bool value);
+void thincfg_set_show_mode_value(const int value);
 
 void thincfg_init(void);
 void thincfg_deinit(void);

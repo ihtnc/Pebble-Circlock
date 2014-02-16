@@ -11,6 +11,22 @@
 static char date_text[] = "XXX 00";
 static char status_text[] = "X X";
 
+static char *splash_date_text[] = 
+{
+	"TWEAKD",
+	"IHTNC",
+	"CIR"
+};
+static char *splash_status_text[] = 
+{
+	"BY",
+	"(C) 2014",
+	"CLOCK"
+};
+
+int splash_count;
+int splash_text_index;
+
 Window *window;
 InverterLayer *inverter;
 
@@ -49,19 +65,31 @@ const GPathInfo HOUR_SEGMENT_PATH_POINTS =
 };
 
 static AppTimer *timer;
+static struct tm *splash_tm; //since the minutes and hour layers uses the wall time, we need something similar for the splash animation
 
 static void determine_invert_status()
 {
-	bool invert = get_invert_mode_value();
+	bool invert = thincfg_get_invert_mode_value();
 	layer_set_frame(inverter_layer_get_layer(inverter), GRect(0, 0, SCREEN_WIDTH, (invert ? SCREEN_HEIGHT : 0)));
 	layer_mark_dirty(inverter_layer_get_layer(inverter));
 }
 
 static void minute_display_layer_update_callback(Layer *layer, GContext* ctx) 
 {
-	time_t now = time(NULL);
-	struct tm *t = localtime(&now);
+	struct tm *t;
+	bool splash = splasher_is_splash_showing();
+	if(splash == true)
+	{
+		t = splash_tm;
+	}
+	else
+	{
+		time_t now = time(NULL);
+		t = localtime(&now);
+	}
+	
 	unsigned int angle = t->tm_min * 6;
+	
 	GRect bounds = layer_get_bounds(layer);
 	GPoint center = grect_center_point(&bounds);
 	
@@ -76,6 +104,18 @@ static void minute_display_layer_update_callback(Layer *layer, GContext* ctx)
 	}
 	
 	graphics_fill_circle(ctx, center, 60);
+}
+
+static void layer_set_splash_date(int splash_index)
+{
+	text_layer_set_text(text_date_layer, splash_date_text[splash_index]);
+	text_layer_set_font(text_date_layer, font);
+}
+
+static void layer_set_splash_status(int splash_index)
+{
+	text_layer_set_text(text_status_layer, splash_status_text[splash_index]);
+	text_layer_set_font(text_status_layer, font);
 }
 
 static void layer_set_status(TextLayer *layer)
@@ -111,16 +151,28 @@ static void layer_set_date(TextLayer *layer)
 
 static void show_text(struct tm *tick_time)
 { 
-	int mode = get_show_mode_value();
+	int mode;
+	bool splash = splasher_is_splash_showing();
+	if(splash == true)
+	{
+		mode = SHOW_DATE_STAT;
+	}
+	else
+	{
+		mode = thincfg_get_show_mode_value();
+	}
+	
 	if (mode == SHOW_DATE || mode == SHOW_DATE_STAT)
 	{
-		if(is_stat_showing == true) layer_set_status(text_date_layer);
+		if(splash == true) layer_set_splash_date(splash_text_index);
+		else if(is_stat_showing == true) layer_set_status(text_date_layer);
 		else layer_set_date(text_date_layer);
 	}
 	
 	if (mode == SHOW_STAT || mode == SHOW_DATE_STAT)
 	{
-		if(is_stat_showing == true) layer_set_date(text_status_layer);
+		if(splash == true) layer_set_splash_status(splash_text_index);
+		else if(is_stat_showing == true) layer_set_date(text_status_layer);
 		else layer_set_status(text_status_layer);
 	}
 	
@@ -139,9 +191,9 @@ static void show_text(struct tm *tick_time)
 
 static void handle_timer(void *data)
 {
-	timer = NULL;
 	is_stat_showing = false;
 	
+	timer = NULL;
 	time_t now = time(NULL);
 	struct tm *t = localtime(&now);
 	show_text(t);
@@ -149,7 +201,10 @@ static void handle_timer(void *data)
 
 static void handle_tap(AccelAxisType axis, int32_t direction)
 {
-	int mode = get_show_mode_value();
+	bool splash = splasher_is_splash_showing();
+	if(splash == true) return;
+	
+	int mode = thincfg_get_show_mode_value();
 	if(mode == SHOW_DATE_STAT) return; //the date and status are already shown so tapping doesn't do anything
 	
 	if(is_stat_showing == true) return;
@@ -164,8 +219,18 @@ static void handle_tap(AccelAxisType axis, int32_t direction)
 
 static void hour_display_layer_update_callback(Layer *layer, GContext* ctx) 
 {
-	time_t now = time(NULL);
-	struct tm *t = localtime(&now);
+	struct tm *t;
+	bool splash = splasher_is_splash_showing();
+	if(splash == true)
+	{
+		t = splash_tm;
+	}
+	else
+	{
+		time_t now = time(NULL);
+		t = localtime(&now);
+	}
+	
 	bool am = (t->tm_hour < 12);
 	
 	unsigned int angle = (( t->tm_hour % 12 ) * 30) + (t->tm_min / 2);
@@ -217,7 +282,11 @@ static void setup_layers()
 	Layer *inverter_layer = inverter_layer_get_layer(inverter);
 	GRect bounds = layer_get_bounds(window_layer);
 	
-	int mode = get_show_mode_value();
+	int mode;
+	bool status = splasher_is_splash_showing();
+	if(status == true) mode = SHOW_DATE_STAT;
+	else mode = thincfg_get_show_mode_value();
+	
 	if(text_date_layer != NULL) text_layer_destroy(text_date_layer);
 	if(text_status_layer != NULL) text_layer_destroy(text_status_layer);
 	
@@ -276,6 +345,21 @@ static void field_changed(const uint32_t key, const void *old_value, const void 
 }
 
 static void face_init()
+{	
+	setup_layers();
+	
+	time_t now = time(NULL);
+	struct tm *t = localtime(&now);
+	show_text(t);
+	
+	layer_mark_dirty(hour_display_layer);
+	layer_mark_dirty(minute_display_layer);
+	
+	tick_timer_service_subscribe(MINUTE_UNIT, handle_minute_tick);
+	accel_tap_service_subscribe(handle_tap);
+}
+
+static void layers_init()
 {
 	Layer *window_layer = window_get_root_layer(window);
 	Layer *inverter_layer = inverter_layer_get_layer(inverter);
@@ -300,13 +384,6 @@ static void face_init()
 	gpath_move_to(hour_segment_path, grect_center_point(&bounds));
 	
 	setup_layers();
-	
-	time_t now = time(NULL);
-	struct tm *t = localtime(&now);
-	show_text(t);
-	
-	tick_timer_service_subscribe(MINUTE_UNIT, handle_minute_tick);
-	accel_tap_service_subscribe(handle_tap);
 }
 
 static void inverter_deinit()
@@ -325,9 +402,42 @@ static void inverter_init()
 	determine_invert_status(t);
 }
 
+static void handle_splash_timer(void *data)
+{
+	if(splash_text_index < 60)
+	{
+		if(splash_text_index % 20 == 0)
+		{
+			layer_set_splash_date(splash_text_index / 20);
+			layer_set_splash_status(splash_text_index / 20);
+		}
+		
+		splash_tm->tm_hour = (splash_text_index / 2.5);
+		layer_mark_dirty(hour_display_layer);
+		
+		splash_tm->tm_min += 5;
+		layer_mark_dirty(minute_display_layer);
+				
+		splash_text_index += 5;
+		timer = app_timer_register(250, handle_splash_timer, NULL);
+	}
+	else
+	{
+		splasher_stop();
+	}
+}
+
 static void splash_init()
 {
-	splasher_stop();
+	time_t now = time(NULL);
+	splash_tm = localtime(&now);
+	splash_tm->tm_hour = 0;
+	splash_tm->tm_min = 0;
+	
+	setup_layers();
+	
+	splash_text_index = 0;
+	timer = app_timer_register(250, handle_splash_timer, NULL);
 }
 
 static void splash_deinit()
@@ -350,6 +460,8 @@ static void init(void)
 	
 	inverter_init();
 	btmonitor_init();
+	
+	layers_init();
 	
 	splasher_init((SplasherCallbacks) { .splash_init = splash_init, .splash_deinit = splash_deinit });
 	splasher_start();
@@ -378,8 +490,6 @@ static void deinit(void)
 	fonts_unload_custom_font(sym_font);
 	
 	accel_data_service_unsubscribe();
-	
-	thincfg_deinit();
 }
 
 int main(void)

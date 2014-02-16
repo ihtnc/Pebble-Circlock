@@ -2,6 +2,7 @@ var enable_logging = false;
 var invert = 0;
 var bt = 0;
 var show = 0;
+var splash = 0;
 
 Pebble.addEventListener("ready", function() {
 	var temp_mode = localStorage.getItem("InvertMode");
@@ -33,6 +34,8 @@ Pebble.addEventListener("ready", function() {
 	else {
 		if(enable_logging) console.log("Pebble.ready: default BTNotification=" + bt);
 	}
+	
+	//we don't need to retrieve the setting for splash since it is not saved in the first place
 });
 
 Pebble.addEventListener("showConfiguration", function(e) {
@@ -68,13 +71,19 @@ Pebble.addEventListener("showConfiguration", function(e) {
 							"'value':'3'" +
 						"}," +
 					"]" +
-				"}," +
+			"}," +
 			"{" +
 				"'caption':'BT Notification'," + 
 				"'key':'BTNotification'," +
 				"'type':'checkbox'," +
 				"'initialValue':'" + bt + "'" +
-			"}" +
+			"}," +
+			"{" +
+				"'caption':'Show Splash Screen'," +
+				"'key':'ShowSplash'," +
+				"'type':'checkbox'," +
+				"'initialValue':'0'," +		
+			"}," +
 		"]";
 	var url = "http://ihtnc-pebble-config.azurewebsites.net/?";
 	var title = "&title=Circlock+Configuration";
@@ -113,17 +122,22 @@ Pebble.addEventListener("webviewclosed", function(e) {
 	localStorage.setItem("ShowMode", show);
 	if(enable_logging) console.log("Pebble.webviewclosed: show=" + show);
 	
-	
 	if(configuration.BTNotification == null) bt = "0";
 	else bt = configuration.BTNotification;
 	
 	localStorage.setItem("BTNotification", bt);
-	if(enable_logging) console.log("Pebble.webviewclosed: bt=" + bt);        
+	if(enable_logging) console.log("Pebble.webviewclosed: bt=" + bt);
 	
-	//since thinCFG returne everything as string, convert the values we retrieved to int before sending to the pebble watchface
+	if(configuration.ShowSplash == null) splash = "0";
+	else splash = configuration.ShowSplash;
+	
+	//we don't need to save the setting for splash, if users wants to see the splash, they need to enable it everytime
+	
+	//since thinCFG returns everything as string, convert the values we retrieved to int before sending to the pebble watchface
 	configuration.InvertMode = parseInt(invert);
 	configuration.ShowMode = parseInt(show);
 	configuration.BTNotification = parseInt(bt);
+	configuration.ShowSplash = parseInt(splash);
 	Pebble.sendAppMessage(configuration);
 	
 	if(enable_logging) console.log("Pebble.sendAppMessage: done");

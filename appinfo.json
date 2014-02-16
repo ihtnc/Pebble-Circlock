@@ -26,7 +26,7 @@
                 "file": "fonts/symbols.ttf"
             },
             {
-                "characterRegex": "[A-Za-z0-9\\s]",
+                "characterRegex": "[A-Za-z0-9\\s\\(\\)]",
                 "type": "font",
                 "name": "FONT_IMAGINE_20",
                 "file": "fonts/imagine.ttf"
